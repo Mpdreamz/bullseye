@@ -53,6 +53,11 @@ namespace BullseyeSmokeTester
 
             Target("no-inputs", Enumerable.Empty<string>(), input => { });
 
+            Target("build", () => { });
+            Target("test", DependsOn("build"), () => { });
+            Target("pack", DependsOn("build"), () => { });
+            Target("publish", DependsOn("pack"), () => { });
+
             return RunTargetsAsync(args);
         }
     }

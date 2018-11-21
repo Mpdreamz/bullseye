@@ -21,6 +21,7 @@ namespace Bullseye.Internal
             var listTargets = false;
             var noColor = false;
             var parallel = false;
+            var showTree = false;
             var skipDependencies = false;
             var verbose = false;
             var host = Host.Unknown;
@@ -61,6 +62,10 @@ namespace Bullseye.Internal
                     case "-p":
                     case "--parallel":
                         parallel = true;
+                        break;
+                    case "-t":
+                    case "--show-tree":
+                        showTree = true;
                         break;
                     case "-s":
                     case "--skip-dependencies":
@@ -156,9 +161,22 @@ namespace Bullseye.Internal
                 return;
             }
 
+            var skiptargets = false;
+
             if (listDependencies || listInputs || listTargets)
             {
                 await console.Out.WriteLineAsync(targets.ToString(listDependencies, listInputs, palette)).ConfigureAwait(false);
+                skiptargets = true;
+            }
+
+            if (showTree)
+            {
+                await console.Out.WriteLineAsync(targets.ToTree(listInputs, palette)).ConfigureAwait(false);
+                skiptargets = true;
+            }
+
+            if (skiptargets)
+            {
                 return;
             }
 
@@ -217,6 +235,47 @@ namespace Bullseye.Internal
             return value.ToString();
         }
 
+        private static string ToTree(this TargetCollection targets, bool listInputs, Palette p)
+        {
+            var tree = new StringBuilder();
+
+            var targetNames = new List<string>();
+
+            if (targets.Contains("default"))
+            {
+                targetNames.Add("default");
+            }
+
+            targetNames.AddRange(targets.Select(target => target.Name).Where(target => target != "default"));
+
+            var teeJunction = "├─";
+            var corner = "└─";
+            var line = "│ ";
+
+            AppendTree(targetNames, new Stack<string>(), 0);
+
+            void AppendTree(List<string> names, Stack<string> seenTargets, int depth)
+            {
+                foreach (var name in names)
+                {
+                    if (seenTargets.Contains(name))
+                    {
+                        continue;
+                    }
+
+                    seenTargets.Push(name);
+
+                    tree.AppendLine($"{new string(' ', depth * 2)}{p.Target}{name}{p.Default}");
+
+                    AppendTree(targets[name].Dependencies, seenTargets, depth + 1);
+
+                    seenTargets.Pop();
+                }
+            }
+
+            return tree.ToString();
+        }
+
         public static string GetUsage(Palette p) =>
 $@"{p.Label}Usage: {p.CommandLine}<command-line> {p.Option}[<options>] {p.Target}[<targets>]
 
@@ -234,6 +293,7 @@ $@"{p.Label}Usage: {p.CommandLine}<command-line> {p.Option}[<options>] {p.Target
  {p.Option}-T, --list-targets         {p.Text}List the targets, then exit
  {p.Option}-N, --no-color             {p.Text}Disable colored output
  {p.Option}-p, --parallel             {p.Text}Run targets in parallel
+ {p.Option}-t, --show-tree            {p.Text}Show the dependency tree, then exit
  {p.Option}-s, --skip-dependencies    {p.Text}Do not run targets' dependencies
  {p.Option}-v, --verbose              {p.Text}Enable verbose output
  {p.Option}    --appveyor             {p.Text}Force Appveyor mode (normally auto-detected)
