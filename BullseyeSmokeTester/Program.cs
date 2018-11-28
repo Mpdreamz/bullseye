@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace BullseyeSmokeTester
 {
     using System;
@@ -47,11 +49,30 @@ namespace BullseyeSmokeTester
                 foos.SelectMany(foo => bars.Select(bar => new { foo, bar })),
                 async o =>
                 {
-                    await Task.Delay((4 - o.bar) * 10);
-                    await Console.Out.WriteLineAsync($"{o.foo},{o.bar}");
+                    throw new Exception("boom!");
                 });
 
             Target("no-inputs", Enumerable.Empty<string>(), input => { });
+
+            InPlaceExceptionHandler = (ex =>
+            {
+                if (ex.Message == "boom!")
+                {
+                    Console.WriteLine();
+                    var fg = Console.ForegroundColor;
+                    var bg = Console.BackgroundColor;
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.BackgroundColor = ConsoleColor.Red;
+                    Console.Error.WriteLine("I exploded the build!");
+                    Console.ForegroundColor = fg;
+                    Console.BackgroundColor = bg;
+                    Console.WriteLine();
+                    return true;
+                }
+
+                return false;
+
+            });
 
             return RunTargetsAsync(args);
         }

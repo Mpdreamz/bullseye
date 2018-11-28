@@ -12,6 +12,8 @@ namespace Bullseye.Internal
     {
         protected override string GetKeyForItem(Target item) => item.Name;
 
+        public Func<Exception, bool> InPlaceExceptionHandler { get; set; }
+
         public async Task RunAsync(List<string> names, bool skipDependencies, bool dryRun, bool parallel, Logger log)
         {
             await log.Running(names).ConfigureAwait(false);
@@ -30,16 +32,23 @@ namespace Bullseye.Internal
                 var targetsRan = new ConcurrentDictionary<string, Task>();
                 if (parallel)
                 {
-                    var tasks = names.Select(name => this.RunAsync(name, names, skipDependencies, dryRun, parallel, targetsRan, log, new Stack<string>()));
+                    var tasks = names.Select(name => this.RunAsync(name, names, skipDependencies, dryRun, parallel,
+                        targetsRan, log, new Stack<string>()));
                     await Task.WhenAll(tasks).ConfigureAwait(false);
                 }
                 else
                 {
                     foreach (var name in names)
                     {
-                        await this.RunAsync(name, names, skipDependencies, dryRun, parallel, targetsRan, log, new Stack<string>()).ConfigureAwait(false);
+                        await this.RunAsync(name, names, skipDependencies, dryRun, parallel, targetsRan, log,
+                            new Stack<string>()).ConfigureAwait(false);
                     }
                 }
+            }
+            catch (TaskExceptionHandledException)
+            {
+                await log.Failed(names, stopWatch.Elapsed.TotalMilliseconds).ConfigureAwait(false);
+                return;
             }
             catch (Exception)
             {
@@ -80,7 +89,7 @@ namespace Bullseye.Internal
             if (!skipDependencies || explicitTargets.Contains(name))
             {
                 await log.Verbose(targets, $"Awaiting...").ConfigureAwait(false);
-                await targetsRan.GetOrAdd(name, _ => target.RunAsync(dryRun, parallel, log)).ConfigureAwait(false);
+                await targetsRan.GetOrAdd(name, _ => target.RunAsync(dryRun, parallel, log, this.InPlaceExceptionHandler)).ConfigureAwait(false);
             }
 
             targets.Pop();
@@ -150,5 +159,6 @@ namespace Bullseye.Internal
                 throw new Exception(message);
             }
         }
+
     }
 }

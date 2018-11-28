@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Bullseye
 {
     using System;
@@ -22,6 +24,8 @@ namespace Bullseye
                 action == null
                     ? default(Func<TInput, Task>)
                     : input => Task.Run(() => action?.Invoke(input)));
+
+
 
         public static void RunTargets(IEnumerable<string> args) => RunTargetsAsync(args).GetAwaiter().GetResult();
     }

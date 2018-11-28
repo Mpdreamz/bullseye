@@ -9,6 +9,12 @@ namespace Bullseye
     {
         private static readonly TargetCollection targets = new TargetCollection();
 
+        public static Func<Exception, bool> InPlaceExceptionHandler
+        {
+            get => targets.InPlaceExceptionHandler;
+            set => targets.InPlaceExceptionHandler = value;
+        }
+
         public static string[] DependsOn(params string[] dependencies) => dependencies;
 
         public static TInput[] ForEach<TInput>(params TInput[] inputs) => inputs;

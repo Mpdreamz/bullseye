@@ -29,7 +29,7 @@ namespace Bullseye.Internal
             }
         }
 
-        public override async Task RunAsync(bool dryRun, bool parallel, Logger log)
+        public override async Task RunAsync(bool dryRun, bool parallel, Logger log, Func<Exception, bool> inPlaceExceptionHandler)
         {
             var inputsList = this.inputs.ToList();
             if (inputsList.Count == 0)
@@ -45,14 +45,14 @@ namespace Bullseye.Internal
             {
                 if (parallel)
                 {
-                    var tasks = inputsList.Select(input => this.InvokeAsync(input, dryRun, log)).ToList();
+                    var tasks = inputsList.Select(input => this.InvokeAsync(input, dryRun, log, inPlaceExceptionHandler)).ToList();
                     await Task.WhenAll(tasks).ConfigureAwait(false);
                 }
                 else
                 {
                     foreach (var input in inputsList)
                     {
-                        await this.InvokeAsync(input, dryRun, log).ConfigureAwait(false);
+                        await this.InvokeAsync(input, dryRun, log, inPlaceExceptionHandler).ConfigureAwait(false);
                     }
                 }
             }
@@ -65,7 +65,7 @@ namespace Bullseye.Internal
             await log.Succeeded(this.Name, stopWatch.Elapsed.TotalMilliseconds).ConfigureAwait(false);
         }
 
-        private async Task InvokeAsync(TInput input, bool dryRun, Logger log)
+        private async Task InvokeAsync(TInput input, bool dryRun, Logger log, Func<Exception, bool> inPlaceExceptionHandler)
         {
             await log.Starting(this.Name, input).ConfigureAwait(false);
             var stopWatch = Stopwatch.StartNew();
@@ -79,6 +79,11 @@ namespace Bullseye.Internal
                         await this.action(input).ConfigureAwait(false);
                     }
                 }
+                catch (Exception ex) when ((inPlaceExceptionHandler ?? (e => false)).Invoke(ex))
+                {
+                    await log.Failed(this.Name, input, ex, stopWatch.Elapsed.TotalMilliseconds).ConfigureAwait(false);
+                    throw new TaskExceptionHandledException();
+                }
                 catch (Exception ex)
                 {
                     await log.Failed(this.Name, input, ex, stopWatch.Elapsed.TotalMilliseconds).ConfigureAwait(false);
@@ -88,5 +93,9 @@ namespace Bullseye.Internal
 
             await log.Succeeded(this.Name, input, stopWatch.Elapsed.TotalMilliseconds).ConfigureAwait(false);
         }
+    }
+
+    public class TaskExceptionHandledException : Exception
+    {
     }
 }

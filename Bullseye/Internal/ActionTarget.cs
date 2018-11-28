@@ -12,7 +12,8 @@ namespace Bullseye.Internal
         public ActionTarget(string name, IEnumerable<string> dependencies, Func<Task> action)
             : base(name, dependencies) => this.action = action;
 
-        public override async Task RunAsync(bool dryRun, bool parallel, Logger log)
+        public override async Task RunAsync(bool dryRun, bool parallel, Logger log,
+            Func<Exception, bool> inPlaceExceptionHandler)
         {
             await log.Starting(this.Name).ConfigureAwait(false);
 
